@@ -1,13 +1,12 @@
 import React from "react";
 import { AiOutlineLogout } from "react-icons/ai";
-import { useNavigate } from "react-router";
+import { useNavigate } from "react-router-dom";
 import Avatar from "../avatar/Avatar";
 import "./Navbar.scss";
 import { useSelector, useDispatch } from "react-redux";
-import { KEY_ACCESS_TOKEN, removeItem } from "../../utils/localStorageManager";
-import { axiosClient } from "../../utils/axiosClient";
-import { showToast } from "../../redux/slices/appConfigSlice";
-import { TOAST_SUCCESS, TOAST_FAILURE } from "../../App";
+import { axiosClient, setSuppressSessionToast } from "../../utils/axiosClient";
+import { showToast, clearMyProfile } from "../../redux/slices/appConfigSlice";
+import { TOAST_SUCCESS } from "../../utils/constants";
 
 function Navbar() {
   const navigate = useNavigate();
@@ -15,10 +14,12 @@ function Navbar() {
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
 
   async function handleLogoutClicked() {
+    setSuppressSessionToast(true);
+
     try {
       await axiosClient.post("/auth/logout");
-      removeItem(KEY_ACCESS_TOKEN);
 
+      dispatch(clearMyProfile());
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
@@ -27,13 +28,11 @@ function Navbar() {
       );
 
       navigate("/login");
-    } catch (e) {
-      dispatch(
-        showToast({
-          type: TOAST_FAILURE,
-          message: "Logout failed. Try again.",
-        })
-      );
+    } catch (err) {
+      dispatch(clearMyProfile());
+      navigate("/login");
+    } finally {
+      setTimeout(() => setSuppressSessionToast(false), 800);
     }
   }
 
@@ -41,7 +40,7 @@ function Navbar() {
     <div className="Navbar">
       <div className="container">
         <h2 className="banner hover-link" onClick={() => navigate("/")}>
-          Mingle
+          Postly
         </h2>
         <div className="right-side">
           {myProfile && (

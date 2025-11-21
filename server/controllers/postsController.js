@@ -1,19 +1,32 @@
-const Post = require("../models/Post");
-const User = require("../models/User");
-const { success, error } = require("../utils/responseWrapper");
-const cloudinary = require("cloudinary").v2;
-const { mapPostOutput } = require("../utils/Utils");
+import Post from "../models/Post.js";
+import User from "../models/User.js";
+import { success, error } from "../utils/responseWrapper.js";
+import { v2 as cloudinary } from "cloudinary";
+import { mapPostOutput } from "../utils/Utils.js";
+import { normalizeId } from "../utils/idUtils.js";
 
-const createPostController = async (req, res) => {
+export const createPostController = async (req, res) => {
   try {
     const { caption, postImg } = req.body;
-
     if (!caption || !postImg) {
-      return res.send(error(400, "Caption and postImg are required"));
+      return res
+        .status(400)
+        .send(
+          error(400, "Both caption and image are required to create a post")
+        );
     }
-    const cloudImg = await cloudinary.uploader.upload(postImg, {
-      folder: "postImg",
-    });
+
+    let cloudImg;
+    try {
+      cloudImg = await cloudinary.uploader.upload(postImg, {
+        folder: "postly/",
+      });
+    } catch (cloudErr) {
+      console.error("Cloudinary upload failed:", cloudErr);
+      return res
+        .status(502)
+        .send(error(502, "Failed to upload image to Cloudinary"));
+    }
 
     const owner = req._id;
     const user = await User.findById(req._id);
@@ -21,99 +34,123 @@ const createPostController = async (req, res) => {
     const post = await Post.create({
       owner,
       caption,
-      image: {
-        publicId: cloudImg.public_id,
-        url: cloudImg.url,
-      },
+      image: { publicId: cloudImg.public_id, url: cloudImg.secure_url },
     });
 
     user.posts.push(post._id);
     await user.save();
 
-    return res.send(success(200, { post }));
+    const createdPost = await Post.findById(post._id)
+      .populate("owner")
+      .populate("likes");
+    return res
+      .status(200)
+      .send(success(200, { post: mapPostOutput(createdPost, req._id) }));
   } catch (err) {
-    return res.send(error(500, err.message));
+    return res.status(500).send(error(500, err.message));
   }
 };
 
-const likeAndUnlikePost = async (req, res) => {
+export const likeAndUnlikePost = async (req, res) => {
   try {
     const { postId } = req.body;
     const curUserId = req._id;
 
     const post = await Post.findById(postId).populate("owner");
     if (!post) {
-      return res.send(error(404, "Post not found"));
+      return res.status(404).send(error(404, "Post not found"));
     }
 
-    if (post.likes.includes(curUserId)) {
-      const index = post.likes.indexOf(curUserId);
-      post.likes.splice(index, 1);
+    const curId = normalizeId(curUserId);
+    const likesArr = (post.likes || []).map(normalizeId);
+
+    if (likesArr.includes(curId)) {
+      post.likes = (post.likes || []).filter((l) => normalizeId(l) !== curId);
     } else {
       post.likes.push(curUserId);
     }
+
     await post.save();
-    return res.send(success(200, { post: mapPostOutput(post, req._id) }));
+    return res
+      .status(200)
+      .send(success(200, { post: mapPostOutput(post, req._id) }));
   } catch (err) {
-    return res.send(error(500, err.message));
+    return res.status(500).send(error(500, err.message));
   }
 };
 
-const updatePostController = async (req, res) => {
+export const updatePostController = async (req, res) => {
   try {
     const { postId, caption } = req.body;
     const curUserId = req._id;
 
     const post = await Post.findById(postId);
     if (!post) {
-      return res.send(error(404, "Post not found"));
+      return res.status(404).send(error(404, "Post not found"));
     }
 
-    if (post.owner.toString() !== curUserId) {
-      return res.send(error(403, "Only owners can update their posts"));
+    if (normalizeId(post.owner) !== normalizeId(curUserId)) {
+      return res
+        .status(403)
+        .send(error(403, "Only owners can update their posts"));
     }
 
-    if (caption) {
+    if (caption !== undefined && caption !== null) {
       post.caption = caption;
     }
 
     await post.save();
-    return res.send(success(200, { post }));
+
+    const updatedPost = await Post.findById(post._id)
+      .populate("owner")
+      .populate("likes");
+    return res
+      .status(200)
+      .send(success(200, { post: mapPostOutput(updatedPost, req._id) }));
   } catch (err) {
-    return res.send(error(500, err.message));
+    return res.status(500).send(error(500, err.message));
   }
 };
 
-const deletePost = async (req, res) => {
+export const deletePost = async (req, res) => {
   try {
     const { postId } = req.body;
     const curUserId = req._id;
 
     const post = await Post.findById(postId);
     const curUser = await User.findById(curUserId);
+
     if (!post) {
-      return res.send(error(404, "Post not found"));
+      return res.status(404).send(error(404, "Post not found"));
     }
 
-    if (post.owner.toString() !== curUserId) {
-      return res.send(error(403, "Only owners can delete their posts"));
+    if (normalizeId(post.owner) !== normalizeId(curUserId)) {
+      return res
+        .status(403)
+        .send(error(403, "Only owners can delete their posts"));
     }
 
-    const index = curUser.posts.indexOf(postId);
-    curUser.posts.splice(index, 1);
-    await curUser.save();
-    // await post.remove();
+    if (post.image?.publicId) {
+      try {
+        await cloudinary.uploader.destroy(post.image.publicId);
+      } catch (cloudErr) {
+        console.error(
+          `Failed to destroy Cloudinary image ${post.image.publicId}:`,
+          cloudErr
+        );
+      }
+    }
+
+    if (curUser) {
+      curUser.posts = (curUser.posts || []).filter(
+        (p) => normalizeId(p) !== normalizeId(postId)
+      );
+      await curUser.save();
+    }
+
     await post.deleteOne();
-
-    return res.send(success(200, "post deleted successfully"));
+    return res.status(200).send(success(200, "Post deleted successfully"));
   } catch (err) {
-    return res.send(error(500, err.message));
+    return res.status(500).send(error(500, err.message));
   }
-};
-
-module.exports = {
-  createPostController,
-  likeAndUnlikePost,
-  updatePostController,
-  deletePost,
 };

@@ -1,10 +1,10 @@
 import React from "react";
-import { Navigate, Outlet } from "react-router";
-import { getItem, KEY_ACCESS_TOKEN } from "../utils/localStorageManager";
+import { Navigate, Outlet } from "react-router-dom";
+import { useSelector } from "react-redux";
 
 function OnlyIfNotLoggedIn() {
-  const user = getItem(KEY_ACCESS_TOKEN);
-  return user ? <Navigate to="/" /> : <Outlet />;
+  const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
+  return myProfile ? <Navigate to="/" /> : <Outlet />;
 }
 
 export default OnlyIfNotLoggedIn;

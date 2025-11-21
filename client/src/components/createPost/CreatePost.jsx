@@ -6,7 +6,7 @@ import { axiosClient } from "../../utils/axiosClient";
 import { useDispatch, useSelector } from "react-redux";
 import { getUserProfile } from "../../redux/slices/postsSlice";
 import { showToast } from "../../redux/slices/appConfigSlice";
-import { TOAST_SUCCESS, TOAST_FAILURE } from "../../App";
+import { TOAST_SUCCESS, TOAST_FAILURE } from "../../utils/constants";
 
 function CreatePost() {
   const [postImg, setPostImg] = useState("");
@@ -49,11 +49,11 @@ function CreatePost() {
   };
 
   const handlePostSubmit = async () => {
-    if (!caption && !postImg) {
+    if (!caption || !postImg) {
       dispatch(
         showToast({
           type: TOAST_FAILURE,
-          message: "Please add a caption or image before posting.",
+          message: "Both caption and image are required to create a post.",
         })
       );
       return;
@@ -74,19 +74,11 @@ function CreatePost() {
 
       dispatch(getUserProfile({ userId: myProfile?._id }));
 
-      // Optional: scroll to top to see new post
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (error) {
-      dispatch(
-        showToast({
-          type: TOAST_FAILURE,
-          message: "Failed to create post. Try again.",
-        })
-      );
-    } finally {
       setCaption("");
       setPostImg("");
-    }
+
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (err) {}
   };
 
   return (

@@ -3,10 +3,12 @@ import appConfigReducer from "./slices/appConfigSlice";
 import postsReducer from "./slices/postsSlice";
 import feedDataReducer from "./slices/feedSlice";
 
-export default configureStore({
+const store = configureStore({
   reducer: {
     appConfigReducer,
     postsReducer,
     feedDataReducer,
   },
 });
+
+export default store;

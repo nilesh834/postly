@@ -1,21 +1,25 @@
-var ta = require("time-ago");
+import { format } from "timeago.js";
+import { normalizeId } from "./idUtils.js";
 
-const mapPostOutput = (post, userId) => {
+export const mapPostOutput = (post, userId) => {
+  if (!post) return null;
+
+  const owner = post.owner && post.owner._id ? post.owner : { _id: post.owner };
+
+  const likesArr = (post.likes || []).map((l) => normalizeId(l));
+  const curId = normalizeId(userId);
+
   return {
-    _id: post._id,
+    _id: normalizeId(post._id),
     caption: post.caption,
     image: post.image,
     owner: {
-      _id: post.owner._id,
-      name: post.owner.name,
-      avatar: post.owner.avatar,
+      _id: owner._id ? normalizeId(owner._id) : null,
+      name: owner.name ?? null,
+      avatar: owner.avatar ?? null,
     },
-    likesCount: post.likes.length,
-    isLiked: post.likes.includes(userId),
-    timeAgo: ta.ago(post.createdAt),
+    likesCount: post.likes ? post.likes.length : 0,
+    isLiked: likesArr.includes(curId),
+    timeAgo: format(post.createdAt),
   };
-};
-
-module.exports = {
-  mapPostOutput,
 };

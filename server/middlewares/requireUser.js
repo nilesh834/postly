@@ -1,35 +1,38 @@
-const jwt = require("jsonwebtoken");
-const User = require("../models/User");
-const { error } = require("../utils/responseWrapper");
+import jwt from "jsonwebtoken";
+import User from "../models/User.js";
+import { error } from "../utils/responseWrapper.js";
 
-module.exports = async (req, res, next) => {
-    if (
-        !req.headers ||
-        !req.headers.authorization ||
-        !req.headers.authorization.startsWith("Bearer")
-    ) {
-        // return res.status(401).send("Authorization header is required");
-        return res.send(error(401, 'Authorization header is required'))
+const requireUser = async (req, res, next) => {
+  try {
+    const accessToken = req.cookies?.access_token;
+    if (!accessToken) {
+      return res.status(401).send(error(401, "Authentication required"));
     }
 
-    const accessToken = req.headers.authorization.split(" ")[1];
-
+    let decoded;
     try {
-        const decoded = jwt.verify(
-            accessToken,
-            process.env.ACCESS_TOKEN_PRIVATE_KEY
-        );
-        req._id = decoded._id;
-        
-        const user = await User.findById(req._id);
-        if(!user) {
-            return res.send(error(404, 'User not found'));
-        }
-
-        next();
+      decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
     } catch (e) {
-        console.log(e);
-        // return res.status(401).send("Invalid access key");
-        return res.send(error(401, 'Invalid access key'))
+      if (e.name === "TokenExpiredError") {
+        return res
+          .status(401)
+          .send(error(401, "Token expired. Please log in again."));
+      }
+      return res.status(401).send(error(401, "Invalid token"));
     }
+
+    req._id = decoded._id;
+    const user = await User.findById(req._id).select("-password");
+    if (!user) {
+      return res.status(404).send(error(404, "User not found"));
+    }
+
+    req.user = user;
+    next();
+  } catch (err) {
+    console.error("requireUser error:", err);
+    return res.status(500).send(error(500, "Internal Server Error"));
+  }
 };
+
+export default requireUser;

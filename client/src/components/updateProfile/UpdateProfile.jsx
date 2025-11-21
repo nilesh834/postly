@@ -6,16 +6,18 @@ import {
   updateMyProfile,
   deleteMyProfile,
   showToast,
+  clearMyProfile,
 } from "../../redux/slices/appConfigSlice";
-import { useNavigate } from "react-router";
-import { TOAST_SUCCESS, TOAST_FAILURE } from "../../App";
+import { useNavigate } from "react-router-dom";
+import { TOAST_SUCCESS, TOAST_FAILURE } from "../../utils/constants";
+import { setSuppressSessionToast } from "../../utils/axiosClient";
 
 function UpdateProfile() {
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
   const [name, setName] = useState("");
   const [bio, setBio] = useState("");
   const [userImg, setUserImg] = useState("");
-  const [showDeleteModal, setShowDeleteModal] = useState(false); // ✅ modal state
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
 
@@ -29,6 +31,28 @@ function UpdateProfile() {
     const file = e.target.files[0];
     if (!file) return;
 
+    // Validate file type
+    if (!file.type.startsWith("image/")) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "Only image files are allowed.",
+        })
+      );
+      return;
+    }
+
+    // Validate file size (<2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "File size should be less than 2MB.",
+        })
+      );
+      return;
+    }
+
     const fileReader = new FileReader();
     fileReader.readAsDataURL(file);
     fileReader.onload = () => {
@@ -40,20 +64,87 @@ function UpdateProfile() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    try {
-      await dispatch(updateMyProfile({ name, bio, userImg })).unwrap();
 
+    // Prevent empty updates
+    const originalName = myProfile?.name || "";
+    const originalBio = myProfile?.bio || "";
+    const originalAvatarUrl = myProfile?.avatar?.url || "";
+    const currentAvatarUrl = userImg || "";
+
+    if (
+      name === originalName &&
+      bio === originalBio &&
+      currentAvatarUrl === originalAvatarUrl
+    ) {
       dispatch(
         showToast({
-          type: TOAST_SUCCESS,
-          message: "Profile updated successfully!",
+          type: TOAST_FAILURE,
+          message: "Please update at least one field before saving.",
         })
       );
+      return;
+    }
+
+    // Validation rules
+    if (name !== undefined && !name.trim()) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "Name cannot be empty.",
+        })
+      );
+      return;
+    }
+
+    if (bio !== undefined && !bio.trim()) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "Bio cannot be empty.",
+        })
+      );
+      return;
+    }
+
+    const payload = {};
+    if (name !== myProfile?.name) payload.name = name.trim();
+    if (bio !== myProfile?.bio) payload.bio = bio.trim();
+
+    if (
+      typeof userImg === "string" &&
+      userImg &&
+      userImg !== myProfile?.avatar?.url &&
+      userImg.startsWith("data:")
+    ) {
+      payload.userImg = userImg;
+    }
+
+    try {
+      const res = await dispatch(updateMyProfile(payload)).unwrap();
+
+      if (res?.warning) {
+        dispatch(
+          showToast({
+            type: TOAST_FAILURE,
+            message:
+              "Profile updated but avatar upload failed. Try again later.",
+          })
+        );
+      } else {
+        dispatch(
+          showToast({
+            type: TOAST_SUCCESS,
+            message: "Profile updated successfully!",
+          })
+        );
+      }
+
+      navigate(`/profile/${myProfile._id}`);
     } catch (err) {
       dispatch(
         showToast({
           type: TOAST_FAILURE,
-          message: err?.response?.data?.message || "Failed to update profile.",
+          message: err?.message || "Failed to update profile.",
         })
       );
     }
@@ -61,23 +152,25 @@ function UpdateProfile() {
 
   async function confirmDeleteAccount() {
     try {
+      setSuppressSessionToast(true);
+
       await dispatch(deleteMyProfile()).unwrap();
+
+      dispatch(clearMyProfile());
+
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: "Account deleted successfully.",
         })
       );
+
       navigate("/login");
     } catch (err) {
-      dispatch(
-        showToast({
-          type: TOAST_FAILURE,
-          message: err?.response?.data?.message || "Failed to delete account.",
-        })
-      );
     } finally {
-      setShowDeleteModal(false); // ✅ always close modal
+      setShowDeleteModal(false);
+
+      setTimeout(() => setSuppressSessionToast(false), 800);
     }
   }
 
@@ -117,15 +210,14 @@ function UpdateProfile() {
 
           <button
             type="button"
-            className="delete-account btn-secondary"
-            onClick={() => setShowDeleteModal(true)} // ✅ open modal
+            className="delete-account btn-primary"
+            onClick={() => setShowDeleteModal(true)}
           >
             Delete Account
           </button>
         </div>
       </div>
 
-      {/* ✅ Custom Delete Modal */}
       {showDeleteModal && (
         <div className="modal-overlay">
           <div className="modal">

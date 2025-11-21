@@ -4,28 +4,16 @@ import Post from "../post/Post";
 import "./Feed.scss";
 import { useSelector, useDispatch } from "react-redux";
 import { getFeedData } from "../../redux/slices/feedSlice";
-import { showToast } from "../../redux/slices/appConfigSlice";
-import { TOAST_FAILURE } from "../../App";
 
 function Feed() {
   const dispatch = useDispatch();
   const feedData = useSelector((state) => state.feedDataReducer.feedData);
+  const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
 
   useEffect(() => {
-    const fetchFeed = async () => {
-      try {
-        await dispatch(getFeedData()).unwrap();
-      } catch (err) {
-        dispatch(
-          showToast({
-            type: TOAST_FAILURE,
-            message: "Failed to load feed. Please try again.",
-          })
-        );
-      }
-    };
-    fetchFeed();
-  }, [dispatch]);
+    if (!myProfile) return;
+    dispatch(getFeedData());
+  }, [dispatch, myProfile]);
 
   return (
     <div className="Feed">

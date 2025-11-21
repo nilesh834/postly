@@ -2,10 +2,13 @@ import React, { useEffect, useState } from "react";
 import Avatar from "../avatar/Avatar";
 import "./Follower.scss";
 import { useSelector, useDispatch } from "react-redux";
-import { followAndUnfollowUser } from "../../redux/slices/feedSlice";
-import { useNavigate } from "react-router";
+import {
+  followAndUnfollowUser,
+  getFeedData,
+} from "../../redux/slices/feedSlice";
+import { useNavigate } from "react-router-dom";
 import { showToast } from "../../redux/slices/appConfigSlice";
-import { TOAST_SUCCESS, TOAST_FAILURE } from "../../App";
+import { TOAST_SUCCESS } from "../../utils/constants";
 
 function Follower({ user }) {
   const dispatch = useDispatch();
@@ -31,17 +34,13 @@ function Follower({ user }) {
         })
       ).unwrap();
 
+      // Refresh Feed Data
+      await dispatch(getFeedData()).unwrap();
+
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: isFollowing ? "Unfollowed user." : "Followed user!",
-        })
-      );
-    } catch (err) {
-      dispatch(
-        showToast({
-          type: TOAST_FAILURE,
-          message: "Failed to follow/unfollow. Try again.",
         })
       );
     } finally {

@@ -1,19 +1,15 @@
-const mongoose = require("mongoose");
+import mongoose from "mongoose";
 
-module.exports = async () => {
-  const mongoUri = process.env.MONGO_URI;
+const dbConnect = async () => {
+  mongoose.set("strictQuery", false);
 
   try {
-    // Add this line to silence the warning
-    mongoose.set("strictQuery", false);
-    const connect = await mongoose.connect(mongoUri, {
-      useUnifiedTopology: true,
-      useNewUrlParser: true,
-    });
-
+    await mongoose.connect(process.env.MONGO_URI, {});
     console.log("✅ MongoDB connected successfully");
   } catch (error) {
-    console.log(error);
-    process.exit(1);
+    console.error("❌ MongoDB connection failed:", error.message);
+    throw error;
   }
 };
+
+export default dbConnect;

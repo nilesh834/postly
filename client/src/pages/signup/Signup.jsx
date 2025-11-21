@@ -3,22 +3,36 @@ import { Link, useNavigate } from "react-router-dom";
 import { axiosClient } from "../../utils/axiosClient";
 import { useDispatch } from "react-redux";
 import { showToast } from "../../redux/slices/appConfigSlice";
-import { TOAST_SUCCESS, TOAST_FAILURE } from "../../App";
+import { TOAST_SUCCESS, TOAST_FAILURE } from "../../utils/constants";
 import "./Signup.scss";
 
 function Signup() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    // Basic validation
+    if (!name.trim() || !email.trim() || !password.trim()) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "All fields are required.",
+        })
+      );
+      return;
+    }
+
+    setSubmitting(true);
     try {
       await axiosClient.post("/auth/signup", {
-        name,
-        email,
+        name: name.trim(),
+        email: email.trim(),
         password,
       });
 
@@ -28,16 +42,10 @@ function Signup() {
           message: "Signup successful! Please log in.",
         })
       );
-
       navigate("/login");
-    } catch (error) {
-      dispatch(
-        showToast({
-          type: TOAST_FAILURE,
-          message:
-            error?.response?.data?.message || "Signup failed. Try again.",
-        })
-      );
+    } catch (err) {
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -73,7 +81,12 @@ function Signup() {
             onChange={(e) => setPassword(e.target.value)}
           />
 
-          <input type="submit" className="submit" value="Sign Up" />
+          <input
+            type="submit"
+            className="submit"
+            value={submitting ? "Signing up..." : "Sign Up"}
+            disabled={submitting}
+          />
         </form>
         <p className="subheading">
           Already have an account? <Link to="/login">Log In</Link>

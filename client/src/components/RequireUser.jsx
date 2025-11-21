@@ -1,12 +1,29 @@
-import React from 'react'
-import { Navigate, Outlet } from 'react-router';
-import { getItem, KEY_ACCESS_TOKEN } from '../utils/localStorageManager'
+import React, { useEffect, useState } from "react";
+import { Navigate, Outlet } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
+import { getMyInfo } from "../redux/slices/appConfigSlice";
 
 function RequireUser() {
-    const user = getItem(KEY_ACCESS_TOKEN);
-  return (
-    user ? <Outlet /> : <Navigate to="/login"/>
-  )
+  const dispatch = useDispatch();
+  const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
+  const [checked, setChecked] = useState(false);
+
+  useEffect(() => {
+    if (!myProfile) {
+      dispatch(getMyInfo())
+        .unwrap()
+        .catch(() => {})
+        .finally(() => setChecked(true));
+    } else {
+      setChecked(true);
+    }
+  }, [dispatch, myProfile]);
+
+  if (!checked) {
+    return null;
+  }
+
+  return myProfile ? <Outlet /> : <Navigate to="/login" />;
 }
 
-export default RequireUser
+export default RequireUser;

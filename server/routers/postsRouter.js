@@ -1,10 +1,17 @@
-const router = require("express").Router();
-const postsController = require("../controllers/postsController");
-const requireUser = require("../middlewares/requireUser");
+import { Router } from "express";
+import {
+  createPostController,
+  likeAndUnlikePost,
+  updatePostController,
+  deletePost,
+} from "../controllers/postsController.js";
+import requireUser from "../middlewares/requireUser.js";
 
-router.post("/", requireUser, postsController.createPostController);
-router.post("/like", requireUser, postsController.likeAndUnlikePost);
-router.put('/', requireUser, postsController.updatePostController);
-router.delete('/', requireUser, postsController.deletePost);
+const router = Router();
 
-module.exports = router;
+router.post("/", requireUser, createPostController);
+router.post("/like", requireUser, likeAndUnlikePost);
+router.put("/", requireUser, updatePostController);
+router.delete("/", requireUser, deletePost);
+
+export default router;

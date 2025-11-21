@@ -1,42 +1,27 @@
 import { createSlice, createAsyncThunk } from "@reduxjs/toolkit";
 import { axiosClient } from "../../utils/axiosClient";
-import { removeItem, KEY_ACCESS_TOKEN } from "../../utils/localStorageManager";
 
-// appConfigSlice.js
-export const getMyInfo = createAsyncThunk(
-  "user/getMyInfo",
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await axiosClient.get("/user/getMyInfo");
-      return response.result;
-    } catch (error) {
-      return rejectWithValue(error);
-    }
-  }
-);
+// Fetch my profile info
+export const getMyInfo = createAsyncThunk("user/getMyInfo", async () => {
+  const response = await axiosClient.get("/user/getMyInfo");
+  return response.result;
+});
 
+// Update profile
 export const updateMyProfile = createAsyncThunk(
   "user/updateMyProfile",
-  async (body, { rejectWithValue }) => {
-    try {
-      const response = await axiosClient.put("/user/", body);
-      return response.result;
-    } catch (error) {
-      return rejectWithValue(error);
-    }
+  async (body) => {
+    const response = await axiosClient.put("/user/", body);
+    return response.result;
   }
 );
 
+// Delete profile
 export const deleteMyProfile = createAsyncThunk(
   "user/deleteMyProfile",
-  async (_, { rejectWithValue }) => {
-    try {
-      const response = await axiosClient.delete("/user");
-      removeItem(KEY_ACCESS_TOKEN);
-      return response.result;
-    } catch (error) {
-      return rejectWithValue(error);
-    }
+  async () => {
+    const response = await axiosClient.delete("/user");
+    return response.result;
   }
 );
 
@@ -54,6 +39,12 @@ const appConfigSlice = createSlice({
     showToast: (state, action) => {
       state.toastData = action.payload;
     },
+    clearMyProfile: (state) => {
+      state.myProfile = null;
+    },
+    setMyProfile: (state, action) => {
+      state.myProfile = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -64,7 +55,6 @@ const appConfigSlice = createSlice({
         state.myProfile = action.payload.user;
       })
       .addCase(deleteMyProfile.fulfilled, (state, action) => {
-        // clear local profile on successful deletion
         state.myProfile = null;
       });
   },
@@ -72,4 +62,5 @@ const appConfigSlice = createSlice({
 
 export default appConfigSlice.reducer;
 
-export const { setLoading, showToast } = appConfigSlice.actions;
+export const { setLoading, showToast, clearMyProfile, setMyProfile } =
+  appConfigSlice.actions;

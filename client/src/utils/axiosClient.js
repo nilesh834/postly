@@ -1,78 +1,98 @@
 import axios from "axios";
 import {
-    getItem,
-    KEY_ACCESS_TOKEN,
-    removeItem,
-    setItem,
-} from "./localStorageManager";
-import store from '../redux/store';
-import { setLoading, showToast } from "../redux/slices/appConfigSlice";
-import { TOAST_FAILURE } from "../App";
+  setLoading,
+  showToast,
+  clearMyProfile,
+} from "../redux/slices/appConfigSlice";
+import { TOAST_FAILURE } from "./constants";
+import { redirectToLogin } from "./navigationHelper";
 
-let baseURL = 'http://localhost:4000/';
-console.log('env is ', process.env.NODE_ENV);
-if(process.env.NODE_ENV === 'production') {
-    baseURL = process.env.REACT_APP_SERVER_BASE_URL
-}
+const baseURL =
+  import.meta.env.MODE === "production"
+    ? import.meta.env.VITE_SERVER_BASE_URL
+    : "http://localhost:4000";
 
 export const axiosClient = axios.create({
-    baseURL,
-    withCredentials: true,
+  baseURL,
+  withCredentials: true,
 });
 
+// store reference
+let localStore = null;
+export const setAxiosStore = (s) => {
+  localStore = s;
+};
+
+// prevent multiple 401-handlings
+let handlingUnauthorized = false;
+
+//Suppression flag for manual logout
+let suppressSessionToast = false;
+export const setSuppressSessionToast = (v) => {
+  suppressSessionToast = Boolean(v);
+};
+
+// request interceptor
 axiosClient.interceptors.request.use((request) => {
-    const accessToken = getItem(KEY_ACCESS_TOKEN);
-    request.headers["Authorization"] = `Bearer ${accessToken}`;
-    store.dispatch(setLoading(true));
-
-    return request;
+  localStore?.dispatch?.(setLoading(true));
+  return request;
 });
 
-axiosClient.interceptors.response.use(async (respone) => {
-    store.dispatch(setLoading(false));
-    const data = respone.data;
+// response interceptor
+axiosClient.interceptors.response.use(
+  (response) => {
+    localStore?.dispatch?.(setLoading(false));
+
+    const data = response.data;
     if (data.status === "ok") {
-        return data;
+      return data;
     }
 
-    const originalRequest = respone.config;
-    const statusCode = data.statusCode;
-    const error = data.message
-    
-    store.dispatch(showToast({
+    // failure toast
+    localStore?.dispatch?.(
+      showToast({
         type: TOAST_FAILURE,
-        message: error
-    }))
+        message: data.message || "Something went wrong.",
+      })
+    );
 
-    if (statusCode === 401 && !originalRequest._retry) {
-        // means the access token has expired
-        originalRequest._retry = true;
+    return Promise.reject(data.message);
+  },
+  (error) => {
+    localStore?.dispatch?.(setLoading(false));
 
-        const response = await axios
-            .create({
-                withCredentials: true,
-            })
-            .get(`${baseURL}/auth/refresh`);
+    // handle unauthorized (401)
+    if (error?.response?.status === 401) {
+      // Skip session toast if manual logout
+      if (!handlingUnauthorized && !suppressSessionToast) {
+        handlingUnauthorized = true;
 
-        if (response.data.status === "ok") {
-            setItem(KEY_ACCESS_TOKEN, response.data.result.accessToken);
-            originalRequest.headers[
-                "Authorization"
-            ] = `Bearer ${response.data.result.accessToken}`;
+        localStore?.dispatch?.(clearMyProfile());
+        localStore?.dispatch?.(
+          showToast({
+            type: TOAST_FAILURE,
+            message: "Session expired. Please log in again.",
+          })
+        );
 
-            return axios(originalRequest);
-        } else {
-            removeItem(KEY_ACCESS_TOKEN);
-            window.location.replace("/login", "_self");
-            return Promise.reject(error);
-        }
+        redirectToLogin();
+
+        setTimeout(() => {
+          handlingUnauthorized = false;
+        }, 3000);
+      }
+
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
-}, async(error) => {
-    store.dispatch(setLoading(false));
-    store.dispatch(showToast({
+
+    // general error toast
+    localStore?.dispatch?.(
+      showToast({
         type: TOAST_FAILURE,
-        message: error.message
-    }))
+        message: error?.response?.data?.message || error.message,
+      })
+    );
+
     return Promise.reject(error);
-});
+  }
+);
