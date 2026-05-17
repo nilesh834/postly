@@ -63,17 +63,26 @@ axiosClient.interceptors.response.use(
 
     // handle unauthorized (401)
     if (error?.response?.status === 401) {
-      // Skip session toast if manual logout
       if (!handlingUnauthorized && !suppressSessionToast) {
         handlingUnauthorized = true;
 
         localStore?.dispatch?.(clearMyProfile());
-        localStore?.dispatch?.(
-          showToast({
-            type: TOAST_FAILURE,
-            message: "Session expired. Please log in again.",
-          })
-        );
+
+        const serverMsg = error?.response?.data?.message;
+
+        // Decide what to show
+        let toastMessage = serverMsg || "Authentication error. Please log in.";
+
+        // Optional: don't show a toast for the very first "Authentication required"
+        // (i.e., user just opened the app, not really a "session expired")
+        if (serverMsg !== "Authentication required") {
+          localStore?.dispatch?.(
+            showToast({
+              type: TOAST_FAILURE,
+              message: toastMessage,
+            })
+          );
+        }
 
         redirectToLogin();
 
