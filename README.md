@@ -96,7 +96,9 @@ Start the frontend:
 
 ## 🖼️ Screenshots
 
-![App Screenshot](https://via.placeholder.com/468x300?text=App+Screenshot+Here)
+<img width="1366" height="720" alt="01" src="https://github.com/user-attachments/assets/c5478f64-b931-4381-927c-0dd6e4e975e9" />
+<img width="1366" height="720" alt="02" src="https://github.com/user-attachments/assets/72c58afd-3faa-4762-885f-5f0bfc4a8834" />
+<img width="1366" height="720" alt="03" src="https://github.com/user-attachments/assets/0270dcc8-b0ac-4f86-85bf-6df244ec5846" />
 
 ## 💖 Acknowledgements
 
