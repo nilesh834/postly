@@ -96,20 +96,22 @@ axiosClient.interceptors.response.use(
       const originalRequest = error.config;
 
       // Skip refresh handling manually
-      if (originalRequest.skipAuthRefresh) {
+      if (originalRequest?.skipAuthRefresh) {
         return Promise.reject(error);
       }
 
+      // Detect initial auth check
       const isInitialAuthCheck =
-        originalRequest.url?.includes("/user/getMyInfo");
+        originalRequest?.url?.includes("/user/getMyInfo");
 
       // Prevent retry loops
-      if (originalRequest._retry) {
+      if (originalRequest?._retry) {
         if (!handlingUnauthorized) {
           handlingUnauthorized = true;
 
           localStore?.dispatch?.(clearMyProfile());
 
+          // Prevent toast on initial auth check
           if (!suppressSessionToast && !isInitialAuthCheck) {
             localStore?.dispatch?.(
               showToast({
@@ -130,7 +132,7 @@ axiosClient.interceptors.response.use(
       }
 
       // Prevent refresh endpoint loops
-      if (originalRequest.url?.includes("/auth/refresh")) {
+      if (originalRequest?.url?.includes("/auth/refresh")) {
         return Promise.reject(error);
       }
 
@@ -144,7 +146,7 @@ axiosClient.interceptors.response.use(
 
         isRefreshing = false;
 
-        // Retry original request
+        // Retry original request after successful refresh
         if (refreshSuccess) {
           return axiosClient(originalRequest);
         }
@@ -156,6 +158,7 @@ axiosClient.interceptors.response.use(
 
         localStore?.dispatch?.(clearMyProfile());
 
+        // Prevent toast on first app load
         if (!suppressSessionToast && !isInitialAuthCheck) {
           localStore?.dispatch?.(
             showToast({
