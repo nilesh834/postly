@@ -4,7 +4,14 @@ import jwt from "jsonwebtoken";
 import { error, success } from "../utils/responseWrapper.js";
 
 const createAccessToken = (payload) =>
-  jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "1h" });
+  jwt.sign(payload, process.env.JWT_SECRET, {
+    expiresIn: "15m",
+  });
+
+const createRefreshToken = (payload) =>
+  jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
+    expiresIn: "7d",
+  });
 
 export const signupController = async (req, res) => {
   try {
@@ -50,13 +57,29 @@ export const loginController = async (req, res) => {
       return res.status(403).send(error(403, "Incorrect password"));
     }
 
-    const accessToken = createAccessToken({ _id: user._id });
+    const accessToken = createAccessToken({
+      _id: user._id,
+    });
 
+    const refreshToken = createRefreshToken({
+      _id: user._id,
+    });
+
+    // ACCESS TOKEN COOKIE
     res.cookie("access_token", accessToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 60 * 60 * 1000,
+      maxAge: 15 * 60 * 1000, // 15 mins
+      path: "/",
+    });
+
+    // REFRESH TOKEN COOKIE
+    res.cookie("refresh_token", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
       path: "/",
     });
 
@@ -79,9 +102,61 @@ export const loginController = async (req, res) => {
   }
 };
 
+export const refreshAccessTokenController = async (req, res) => {
+  try {
+    const refreshToken = req.cookies?.refresh_token;
+
+    if (!refreshToken) {
+      return res.status(401).send(error(401, "Refresh token missing"));
+    }
+
+    let decoded;
+
+    try {
+      decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    } catch (err) {
+      return res.status(401).send(error(401, "Invalid refresh token"));
+    }
+
+    const user = await User.findById(decoded._id);
+
+    if (!user) {
+      return res.status(404).send(error(404, "User not found"));
+    }
+
+    // CREATE NEW ACCESS TOKEN
+    const newAccessToken = createAccessToken({
+      _id: user._id,
+    });
+
+    // SET NEW ACCESS TOKEN COOKIE
+    res.cookie("access_token", newAccessToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      maxAge: 15 * 60 * 1000,
+      path: "/",
+    });
+
+    return res.status(200).send(
+      success(200, {
+        message: "Access token refreshed",
+      }),
+    );
+  } catch (err) {
+    return res.status(500).send(error(500, err.message));
+  }
+};
+
 export const logoutController = async (req, res) => {
   try {
     res.clearCookie("access_token", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+      path: "/",
+    });
+    res.clearCookie("refresh_token", {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",

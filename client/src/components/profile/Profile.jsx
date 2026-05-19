@@ -8,7 +8,7 @@ import { useDispatch, useSelector } from "react-redux";
 import { getUserProfile } from "../../redux/slices/postsSlice";
 import {
   followAndUnfollowUser,
-  getFeedData,
+  updateFollowState,
 } from "../../redux/slices/feedSlice";
 import { showToast } from "../../redux/slices/appConfigSlice";
 import { TOAST_SUCCESS } from "../../utils/constants";
@@ -31,27 +31,38 @@ function Profile() {
     dispatch(getUserProfile({ userId: params.userId }));
 
     setIsMyProfile(myProfile?._id === params.userId);
+  }, [myProfile, params.userId, dispatch]);
+
+  useEffect(() => {
     setIsFollowing(
-      !!feedData?.followings?.find((item) => item._id === params.userId)
+      !!feedData?.followings?.find((item) => item._id === params.userId),
     );
-  }, [myProfile, params.userId, feedData, dispatch]);
+  }, [feedData, params.userId]);
 
   async function handleUserFollow() {
     if (followLoading) return;
+
     setFollowLoading(true);
 
     try {
-      await dispatch(
-        followAndUnfollowUser({ userIdToFollow: params.userId })
+      const wasFollowing = !!feedData?.followings?.find(
+        (item) => item._id === params.userId,
+      );
+
+      const updatedUser = await dispatch(
+        followAndUnfollowUser({
+          userIdToFollow: params.userId,
+        }),
       ).unwrap();
 
-      await dispatch(getFeedData()).unwrap();
+      // Optimistic Redux update
+      dispatch(updateFollowState(updatedUser));
 
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
-          message: isFollowing ? "Unfollowed user." : "Followed user.",
-        })
+          message: wasFollowing ? "Unfollowed user." : "Followed user.",
+        }),
       );
     } finally {
       setFollowLoading(false);

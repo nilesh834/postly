@@ -22,7 +22,7 @@ function Login() {
         showToast({
           type: TOAST_FAILURE,
           message: "Email and password are required.",
-        })
+        }),
       );
       return;
     }
@@ -37,11 +37,10 @@ function Login() {
       const user = response?.result?.user;
       if (user) {
         dispatch(setMyProfile(user));
-      } else {
       }
 
       dispatch(
-        showToast({ type: TOAST_SUCCESS, message: "Login successful!" })
+        showToast({ type: TOAST_SUCCESS, message: "Login successful!" }),
       );
       navigate("/");
     } catch (err) {

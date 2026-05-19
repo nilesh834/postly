@@ -1,5 +1,6 @@
 import Post from "../models/Post.js";
 import User from "../models/User.js";
+import Comment from "../models/Comment.js";
 import { success, error } from "../utils/responseWrapper.js";
 import { v2 as cloudinary } from "cloudinary";
 import { mapPostOutput } from "../utils/Utils.js";
@@ -12,7 +13,7 @@ export const createPostController = async (req, res) => {
       return res
         .status(400)
         .send(
-          error(400, "Both caption and image are required to create a post")
+          error(400, "Both caption and image are required to create a post"),
         );
     }
 
@@ -136,17 +137,21 @@ export const deletePost = async (req, res) => {
       } catch (cloudErr) {
         console.error(
           `Failed to destroy Cloudinary image ${post.image.publicId}:`,
-          cloudErr
+          cloudErr,
         );
       }
     }
 
     if (curUser) {
       curUser.posts = (curUser.posts || []).filter(
-        (p) => normalizeId(p) !== normalizeId(postId)
+        (p) => normalizeId(p) !== normalizeId(postId),
       );
       await curUser.save();
     }
+
+    await Comment.deleteMany({
+      post: postId,
+    });
 
     await post.deleteOne();
     return res.status(200).send(success(200, "Post deleted successfully"));

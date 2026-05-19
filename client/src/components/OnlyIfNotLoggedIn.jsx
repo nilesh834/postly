@@ -4,7 +4,7 @@ import { useSelector } from "react-redux";
 
 function OnlyIfNotLoggedIn() {
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
-  return myProfile ? <Navigate to="/" /> : <Outlet />;
+  return myProfile ? <Navigate to="/" replace /> : <Outlet />;
 }
 
 export default OnlyIfNotLoggedIn;

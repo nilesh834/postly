@@ -1,10 +1,13 @@
 import axios from "axios";
+
 import {
   setLoading,
   showToast,
   clearMyProfile,
 } from "../redux/slices/appConfigSlice";
+
 import { TOAST_FAILURE } from "./constants";
+
 import { redirectToLogin } from "./navigationHelper";
 
 const baseURL =
@@ -17,91 +20,143 @@ export const axiosClient = axios.create({
   withCredentials: true,
 });
 
-// store reference
+// Store reference
 let localStore = null;
+
 export const setAxiosStore = (s) => {
   localStore = s;
 };
 
-// prevent multiple 401-handlings
-let handlingUnauthorized = false;
+// Refresh-token state
+let isRefreshing = false;
 
-//Suppression flag for manual logout
+// Suppression flag for manual logout
 let suppressSessionToast = false;
+
 export const setSuppressSessionToast = (v) => {
   suppressSessionToast = Boolean(v);
 };
 
-// request interceptor
+// Refresh access token silently
+const refreshAccessToken = async () => {
+  try {
+    await axios.post(
+      `${baseURL}/auth/refresh`,
+      {},
+      {
+        withCredentials: true,
+      },
+    );
+
+    return true;
+  } catch (err) {
+    console.error("Refresh token failed:", err);
+  }
+};
+
+// REQUEST INTERCEPTOR
 axiosClient.interceptors.request.use((request) => {
   localStore?.dispatch?.(setLoading(true));
+
   return request;
 });
 
-// response interceptor
+// RESPONSE INTERCEPTOR
 axiosClient.interceptors.response.use(
   (response) => {
     localStore?.dispatch?.(setLoading(false));
 
     const data = response.data;
+
     if (data.status === "ok") {
       return data;
     }
 
-    // failure toast
+    // Failure toast
     localStore?.dispatch?.(
       showToast({
         type: TOAST_FAILURE,
         message: data.message || "Something went wrong.",
-      })
+      }),
     );
 
     return Promise.reject(data.message);
   },
-  (error) => {
+
+  async (error) => {
     localStore?.dispatch?.(setLoading(false));
 
-    // handle unauthorized (401)
+    // HANDLE 401
     if (error?.response?.status === 401) {
-      if (!handlingUnauthorized && !suppressSessionToast) {
-        handlingUnauthorized = true;
+      const originalRequest = error.config;
+      if (originalRequest.skipAuthRefresh) {
+        return Promise.reject(error);
+      }
 
+      // Prevent retry loops
+      if (originalRequest._retry) {
         localStore?.dispatch?.(clearMyProfile());
 
-        const serverMsg = error?.response?.data?.message;
-
-        // Decide what to show
-        let toastMessage = serverMsg || "Authentication error. Please log in.";
-
-        // Optional: don't show a toast for the very first "Authentication required"
-        // (i.e., user just opened the app, not really a "session expired")
-        if (serverMsg !== "Authentication required") {
+        if (!suppressSessionToast) {
           localStore?.dispatch?.(
             showToast({
               type: TOAST_FAILURE,
-              message: toastMessage,
-            })
+              message: "Session expired. Please log in again.",
+            }),
           );
         }
 
         redirectToLogin();
 
-        setTimeout(() => {
-          handlingUnauthorized = false;
-        }, 3000);
+        return Promise.reject(error);
       }
+
+      // Prevent refresh endpoint loops
+      if (originalRequest.url?.includes("/auth/refresh")) {
+        return Promise.reject(error);
+      }
+
+      originalRequest._retry = true;
+
+      // Avoid multiple simultaneous refresh calls
+      if (!isRefreshing) {
+        isRefreshing = true;
+
+        const refreshSuccess = await refreshAccessToken();
+
+        isRefreshing = false;
+
+        // Retry original request
+        if (refreshSuccess) {
+          return axiosClient(originalRequest);
+        }
+      }
+
+      // Refresh failed
+      localStore?.dispatch?.(clearMyProfile());
+
+      if (!suppressSessionToast) {
+        localStore?.dispatch?.(
+          showToast({
+            type: TOAST_FAILURE,
+            message: "Session expired. Please log in again.",
+          }),
+        );
+      }
+
+      redirectToLogin();
 
       return Promise.reject(error);
     }
 
-    // general error toast
+    // GENERAL ERROR HANDLING
     localStore?.dispatch?.(
       showToast({
         type: TOAST_FAILURE,
         message: error?.response?.data?.message || error.message,
-      })
+      }),
     );
 
     return Promise.reject(error);
-  }
+  },
 );

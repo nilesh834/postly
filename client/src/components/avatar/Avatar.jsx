@@ -5,7 +5,7 @@ import "./Avatar.scss";
 function Avatar({ src }) {
   return (
     <div className="Avatar">
-      <img src={src ? src : userImg} alt="user avatar" />
+      <img src={src || userImg} alt="user avatar" />
     </div>
   );
 }

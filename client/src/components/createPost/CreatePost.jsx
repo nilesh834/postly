@@ -6,11 +6,13 @@ import { axiosClient } from "../../utils/axiosClient";
 import { useDispatch, useSelector } from "react-redux";
 import { getUserProfile } from "../../redux/slices/postsSlice";
 import { showToast } from "../../redux/slices/appConfigSlice";
+import { prependFeedPost } from "../../redux/slices/feedSlice";
 import { TOAST_SUCCESS, TOAST_FAILURE } from "../../utils/constants";
 
 function CreatePost() {
   const [postImg, setPostImg] = useState("");
   const [caption, setCaption] = useState("");
+  const [uploading, setUploading] = useState(false);
   const dispatch = useDispatch();
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
 
@@ -23,7 +25,7 @@ function CreatePost() {
         showToast({
           type: TOAST_FAILURE,
           message: "Only image files are allowed.",
-        })
+        }),
       );
       return;
     }
@@ -34,7 +36,7 @@ function CreatePost() {
         showToast({
           type: TOAST_FAILURE,
           message: "File size should be less than 2MB.",
-        })
+        }),
       );
       return;
     }
@@ -54,31 +56,48 @@ function CreatePost() {
         showToast({
           type: TOAST_FAILURE,
           message: "Both caption and image are required to create a post.",
-        })
+        }),
       );
+
       return;
     }
 
+    if (uploading) return;
+
+    setUploading(true);
+
     try {
-      await axiosClient.post("/posts", {
+      const response = await axiosClient.post("/posts", {
         caption,
         postImg,
       });
+
+      // Refresh profile posts
+      await dispatch(
+        getUserProfile({
+          userId: myProfile?._id,
+        }),
+      );
+
+      dispatch(prependFeedPost(response.result.post));
 
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: "Post created successfully 🎉",
-        })
+        }),
       );
-
-      dispatch(getUserProfile({ userId: myProfile?._id }));
 
       setCaption("");
       setPostImg("");
 
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {}
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth",
+      });
+    } finally {
+      setUploading(false);
+    }
   };
 
   return (
@@ -117,8 +136,13 @@ function CreatePost() {
             type="button"
             className="post-btn btn-primary"
             onClick={handlePostSubmit}
+            disabled={uploading}
+            style={{
+              opacity: uploading ? 0.7 : 1,
+              pointerEvents: uploading ? "none" : "auto",
+            }}
           >
-            Post
+            {uploading ? "Posting..." : "Post"}
           </button>
         </div>
       </div>

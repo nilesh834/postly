@@ -175,9 +175,15 @@ export const deleteMyProfile = async (req, res) => {
         sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
         path: "/",
       });
+      res.clearCookie("refresh_token", {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+        path: "/",
+      });
     } catch (cookieErr) {
       console.error(
-        "Failed to clear access_token cookie after deleting user:",
+        "Failed to clear auth cookies after deleting user:",
         cookieErr,
       );
     }

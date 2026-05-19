@@ -1,29 +1,47 @@
 import React, { useEffect, useState } from "react";
+
 import { Navigate, Outlet } from "react-router-dom";
+
 import { useDispatch, useSelector } from "react-redux";
+
 import { getMyInfo } from "../redux/slices/appConfigSlice";
 
 function RequireUser() {
   const dispatch = useDispatch();
+
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
-  const [checked, setChecked] = useState(false);
+
+  const [checkedAuth, setCheckedAuth] = useState(false);
 
   useEffect(() => {
-    if (!myProfile) {
-      dispatch(getMyInfo())
-        .unwrap()
-        .catch(() => {})
-        .finally(() => setChecked(true));
+    const checkAuth = async () => {
+      try {
+        await dispatch(getMyInfo()).unwrap();
+      } catch (err) {
+      } finally {
+        setCheckedAuth(true);
+      }
+    };
+
+    // Only check once on mount
+    if (!checkedAuth && !myProfile) {
+      checkAuth();
     } else {
-      setChecked(true);
+      setCheckedAuth(true);
     }
   }, [dispatch, myProfile]);
 
-  if (!checked) {
+  // Prevent flashing during auth check
+  if (!checkedAuth) {
     return null;
   }
 
-  return myProfile ? <Outlet /> : <Navigate to="/login" />;
+  // If logged out → redirect immediately
+  if (!myProfile) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <Outlet />;
 }
 
 export default RequireUser;

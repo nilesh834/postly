@@ -20,6 +20,7 @@ export const mapPostOutput = (post, userId) => {
     },
     likesCount: post.likes ? post.likes.length : 0,
     isLiked: likesArr.includes(curId),
+    commentsCount: post.comments?.length || 0,
     timeAgo: format(post.createdAt),
   };
 };

@@ -17,14 +17,20 @@ function Navbar() {
     setSuppressSessionToast(true);
 
     try {
-      await axiosClient.post("/auth/logout");
+      await axiosClient.post(
+        "/auth/logout",
+        {},
+        {
+          skipAuthRefresh: true,
+        },
+      );
 
       dispatch(clearMyProfile());
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: "Logged out successfully.",
-        })
+        }),
       );
 
       navigate("/login");

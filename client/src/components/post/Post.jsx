@@ -204,6 +204,20 @@ function Post({ post }) {
       ).unwrap();
 
       setCommentText("");
+
+      dispatch(
+        showToast({
+          type: TOAST_SUCCESS,
+          message: "Comment added successfully.",
+        }),
+      );
+    } catch (err) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "Failed to add comment.",
+        }),
+      );
     } finally {
       setCommentLoading(false);
     }
@@ -218,7 +232,21 @@ function Post({ post }) {
           postId: post._id,
         }),
       ).unwrap();
-    } catch (err) {}
+
+      dispatch(
+        showToast({
+          type: TOAST_SUCCESS,
+          message: "Comment deleted successfully.",
+        }),
+      );
+    } catch (err) {
+      dispatch(
+        showToast({
+          type: TOAST_FAILURE,
+          message: "Failed to delete comment.",
+        }),
+      );
+    }
   }
 
   return (
@@ -327,9 +355,14 @@ function Post({ post }) {
             <button
               className="btn-primary"
               onClick={handleCreateComment}
-              disabled={commentLoading}
+              disabled={commentLoading || !commentText.trim()}
+              style={{
+                opacity: commentLoading || !commentText.trim() ? 0.6 : 1,
+                pointerEvents:
+                  commentLoading || !commentText.trim() ? "none" : "auto",
+              }}
             >
-              Comment
+              {commentLoading ? "Posting..." : "Comment"}
             </button>
           </div>
 

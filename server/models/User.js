@@ -7,6 +7,7 @@ const userSchema = mongoose.Schema(
       required: true,
       unique: true,
       lowercase: true,
+      trim: true,
     },
     password: {
       type: String,
@@ -16,9 +17,11 @@ const userSchema = mongoose.Schema(
     name: {
       type: String,
       required: true,
+      trim: true,
     },
     bio: {
       type: String,
+      trim: true,
     },
     avatar: {
       publicId: String,
@@ -45,7 +48,7 @@ const userSchema = mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 export default mongoose.model("user", userSchema);
