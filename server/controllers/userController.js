@@ -33,10 +33,10 @@ export const followOrUnfollowUserController = async (req, res) => {
 
     if (isFollowing) {
       curUser.followings = (curUser.followings || []).filter(
-        (id) => normalizeId(id) !== targetId
+        (id) => normalizeId(id) !== targetId,
       );
       userToFollow.followers = (userToFollow.followers || []).filter(
-        (id) => normalizeId(id) !== curId
+        (id) => normalizeId(id) !== curId,
       );
     } else {
       curUser.followings = curUser.followings || [];
@@ -58,32 +58,59 @@ export const followOrUnfollowUserController = async (req, res) => {
 export const getPostsOfFollowing = async (req, res) => {
   try {
     const curUserId = req._id;
+
     const curUser = await User.findById(curUserId).populate("followings");
 
     if (!curUser) {
       return res.status(404).send(error(404, "User not found"));
     }
 
-    const fullPosts = await Post.find({
+    // PAGINATION
+    const page = Number(req.query.page) || 1;
+    const limit = Number(req.query.limit) || 5;
+
+    const skip = (page - 1) * limit;
+
+    // PAGINATED POSTS
+    const paginatedPosts = await Post.find({
       owner: { $in: curUser.followings },
-    }).populate("owner");
+    })
+      .populate("owner")
+      .populate("likes")
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    const posts = fullPosts
-      .map((item) => mapPostOutput(item, req._id))
-      .reverse();
+    const posts = paginatedPosts.map((item) => mapPostOutput(item, req._id));
 
+    // TOTAL POSTS COUNT
+    const totalPosts = await Post.countDocuments({
+      owner: { $in: curUser.followings },
+    });
+
+    const hasMore = skip + posts.length < totalPosts;
+
+    // FOLLOWINGS IDS
     const followingsIds = (curUser.followings || []).map((item) =>
-      normalizeId(item._id || item)
+      normalizeId(item._id || item),
     );
+
     followingsIds.push(normalizeId(req._id));
 
+    // SUGGESTIONS
     const suggestions = await User.find({
       _id: { $nin: followingsIds },
     });
 
-    return res
-      .status(200)
-      .send(success(200, { ...curUser._doc, suggestions, posts }));
+    return res.status(200).send(
+      success(200, {
+        posts,
+        followings: curUser.followings,
+        suggestions,
+        hasMore,
+        currentPage: page,
+      }),
+    );
   } catch (err) {
     return res.status(500).send(error(500, err.message));
   }
@@ -106,7 +133,7 @@ export const deleteMyProfile = async (req, res) => {
         } catch (cloudErr) {
           console.error(
             `Failed to destroy Cloudinary image ${post.image.publicId}:`,
-            cloudErr
+            cloudErr,
           );
         }
       }
@@ -120,7 +147,7 @@ export const deleteMyProfile = async (req, res) => {
       } catch (cloudErr) {
         console.error(
           `Failed to destroy Cloudinary avatar ${curUser.avatar.publicId}:`,
-          cloudErr
+          cloudErr,
         );
       }
     }
@@ -128,15 +155,15 @@ export const deleteMyProfile = async (req, res) => {
     // BULK DB OPERATIONS
     await User.updateMany(
       { followings: curUserId },
-      { $pull: { followings: curUserId } }
+      { $pull: { followings: curUserId } },
     );
     await User.updateMany(
       { followers: curUserId },
-      { $pull: { followers: curUserId } }
+      { $pull: { followers: curUserId } },
     );
     await Post.updateMany(
       { likes: curUserId },
-      { $pull: { likes: curUserId } }
+      { $pull: { likes: curUserId } },
     );
 
     await User.deleteOne({ _id: curUserId });
@@ -151,7 +178,7 @@ export const deleteMyProfile = async (req, res) => {
     } catch (cookieErr) {
       console.error(
         "Failed to clear access_token cookie after deleting user:",
-        cookieErr
+        cookieErr,
       );
     }
 
@@ -205,7 +232,7 @@ export const updateUserProfile = async (req, res) => {
         } catch (cloudErr) {
           console.error(
             `Failed to destroy Cloudinary avatar ${user.avatar.publicId}:`,
-            cloudErr
+            cloudErr,
           );
         }
       }

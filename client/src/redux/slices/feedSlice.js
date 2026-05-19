@@ -3,10 +3,16 @@ import { axiosClient } from "../../utils/axiosClient";
 import { likeAndUnlikePost, updatePost, deletePost } from "./postsSlice";
 
 // Fetch feed data
-export const getFeedData = createAsyncThunk("user/getFeedData", async () => {
-  const response = await axiosClient.get("/user/getFeedData");
-  return response.result;
-});
+export const getFeedData = createAsyncThunk(
+  "user/getFeedData",
+  async ({ page = 1, limit = 5 }) => {
+    const response = await axiosClient.get(
+      `/user/getFeedData?page=${page}&limit=${limit}`,
+    );
+
+    return response.result;
+  },
+);
 
 // Follow & unfollow a user
 export const followAndUnfollowUser = createAsyncThunk(
@@ -14,25 +20,48 @@ export const followAndUnfollowUser = createAsyncThunk(
   async (body) => {
     const response = await axiosClient.post("/user/follow", body);
     return response.result.user;
-  }
+  },
 );
 
 const feedSlice = createSlice({
   name: "feedSlice",
   initialState: {
-    feedData: { posts: [], followings: [], suggestions: [] },
+    feedData: {
+      posts: [],
+      followings: [],
+      suggestions: [],
+      hasMore: true,
+      currentPage: 1,
+    },
   },
 
   extraReducers: (builder) => {
     builder
       .addCase(getFeedData.fulfilled, (state, action) => {
-        state.feedData = action.payload;
+        const { posts, followings, suggestions, hasMore, currentPage } =
+          action.payload;
+
+        // First page → replace posts
+        if (currentPage === 1) {
+          state.feedData.posts = posts;
+        }
+
+        // Next pages → append posts
+        else {
+          state.feedData.posts.push(...posts);
+        }
+
+        state.feedData.followings = followings;
+        state.feedData.suggestions = suggestions;
+
+        state.feedData.hasMore = hasMore;
+        state.feedData.currentPage = currentPage;
       })
       .addCase(likeAndUnlikePost.fulfilled, (state, action) => {
         const post = action.payload;
 
         const index = state.feedData?.posts?.findIndex(
-          (item) => item._id === post._id
+          (item) => item._id === post._id,
         );
 
         if (typeof index === "number" && index >= 0) {
@@ -42,7 +71,7 @@ const feedSlice = createSlice({
       .addCase(followAndUnfollowUser.fulfilled, (state, action) => {
         const user = action.payload;
         const index = state.feedData?.followings?.findIndex(
-          (item) => item._id === user._id
+          (item) => item._id === user._id,
         );
 
         if (typeof index === "number" && index >= 0) {
@@ -56,7 +85,7 @@ const feedSlice = createSlice({
         const post = action.payload;
 
         const index = state.feedData?.posts?.findIndex(
-          (item) => item._id === post._id
+          (item) => item._id === post._id,
         );
 
         if (typeof index === "number" && index >= 0) {
@@ -68,7 +97,7 @@ const feedSlice = createSlice({
 
         if (Array.isArray(state.feedData?.posts)) {
           state.feedData.posts = state.feedData.posts.filter(
-            (p) => p._id !== deletedPostId
+            (p) => p._id !== deletedPostId,
           );
         }
       });
