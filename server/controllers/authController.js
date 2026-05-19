@@ -5,12 +5,14 @@ import { error, success } from "../utils/responseWrapper.js";
 
 const createAccessToken = (payload) =>
   jwt.sign(payload, process.env.JWT_SECRET, {
-    expiresIn: "15m",
+    // expiresIn: "15m",
+    expiresIn: "1m",
   });
 
 const createRefreshToken = (payload) =>
   jwt.sign(payload, process.env.JWT_REFRESH_SECRET, {
-    expiresIn: "7d",
+    // expiresIn: "7d",
+    expiresIn: "5m",
   });
 
 export const signupController = async (req, res) => {
@@ -70,7 +72,8 @@ export const loginController = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 15 * 60 * 1000, // 15 mins
+      // maxAge: 15 * 60 * 1000, // 15 mins
+      maxAge: 60 * 1000, // 1 minute for testing
       path: "/",
     });
 
@@ -79,7 +82,8 @@ export const loginController = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      // maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge: 5 * 60 * 1000, // 5 minutes for testing
       path: "/",
     });
 

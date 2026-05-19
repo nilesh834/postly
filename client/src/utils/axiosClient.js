@@ -30,6 +30,9 @@ export const setAxiosStore = (s) => {
 // Refresh-token state
 let isRefreshing = false;
 
+// Prevent multiple unauthorized handlers
+let handlingUnauthorized = false;
+
 // Suppression flag for manual logout
 let suppressSessionToast = false;
 
@@ -51,6 +54,8 @@ const refreshAccessToken = async () => {
     return true;
   } catch (err) {
     console.error("Refresh token failed:", err);
+
+    return false;
   }
 };
 
@@ -89,24 +94,37 @@ axiosClient.interceptors.response.use(
     // HANDLE 401
     if (error?.response?.status === 401) {
       const originalRequest = error.config;
+
+      // Skip refresh handling manually
       if (originalRequest.skipAuthRefresh) {
         return Promise.reject(error);
       }
 
+      const isInitialAuthCheck =
+        originalRequest.url?.includes("/user/getMyInfo");
+
       // Prevent retry loops
       if (originalRequest._retry) {
-        localStore?.dispatch?.(clearMyProfile());
+        if (!handlingUnauthorized) {
+          handlingUnauthorized = true;
 
-        if (!suppressSessionToast) {
-          localStore?.dispatch?.(
-            showToast({
-              type: TOAST_FAILURE,
-              message: "Session expired. Please log in again.",
-            }),
-          );
+          localStore?.dispatch?.(clearMyProfile());
+
+          if (!suppressSessionToast && !isInitialAuthCheck) {
+            localStore?.dispatch?.(
+              showToast({
+                type: TOAST_FAILURE,
+                message: "Session expired. Please log in again.",
+              }),
+            );
+          }
+
+          redirectToLogin();
+
+          setTimeout(() => {
+            handlingUnauthorized = false;
+          }, 1500);
         }
-
-        redirectToLogin();
 
         return Promise.reject(error);
       }
@@ -133,18 +151,26 @@ axiosClient.interceptors.response.use(
       }
 
       // Refresh failed
-      localStore?.dispatch?.(clearMyProfile());
+      if (!handlingUnauthorized) {
+        handlingUnauthorized = true;
 
-      if (!suppressSessionToast) {
-        localStore?.dispatch?.(
-          showToast({
-            type: TOAST_FAILURE,
-            message: "Session expired. Please log in again.",
-          }),
-        );
+        localStore?.dispatch?.(clearMyProfile());
+
+        if (!suppressSessionToast && !isInitialAuthCheck) {
+          localStore?.dispatch?.(
+            showToast({
+              type: TOAST_FAILURE,
+              message: "Session expired. Please log in again.",
+            }),
+          );
+        }
+
+        redirectToLogin();
+
+        setTimeout(() => {
+          handlingUnauthorized = false;
+        }, 1500);
       }
-
-      redirectToLogin();
 
       return Promise.reject(error);
     }
