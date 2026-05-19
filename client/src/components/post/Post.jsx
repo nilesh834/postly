@@ -1,15 +1,28 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Avatar from "../avatar/Avatar";
 import "./Post.scss";
+
 import { AiFillHeart, AiOutlineHeart } from "react-icons/ai";
+import { MdDelete } from "react-icons/md";
+
 import { useDispatch, useSelector } from "react-redux";
+
 import {
   likeAndUnlikePost,
   updatePost,
   deletePost,
 } from "../../redux/slices/postsSlice";
+
+import {
+  getComments,
+  createComment,
+  deleteComment,
+} from "../../redux/slices/commentsSlice";
+
 import { useNavigate } from "react-router-dom";
+
 import { showToast } from "../../redux/slices/appConfigSlice";
+
 import { TOAST_SUCCESS, TOAST_FAILURE } from "../../utils/constants";
 
 function Post({ post }) {
@@ -25,20 +38,39 @@ function Post({ post }) {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
 
+  // COMMENT STATES
+  const [commentText, setCommentText] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+
   const myProfile = useSelector((state) => state.appConfigReducer.myProfile);
+
+  const commentsByPost = useSelector(
+    (state) => state.commentsReducer.commentsByPost,
+  );
+
+  const comments = commentsByPost?.[post._id] || [];
+
   const isMyPost = myProfile?._id === post.owner._id;
+
+  // FETCH COMMENTS
+  useEffect(() => {
+    dispatch(getComments(post._id));
+  }, [dispatch, post._id]);
 
   // Like & Unlike
   async function handlePostLiked() {
     if (likeLoading) return;
+
     setLikeLoading(true);
+
     try {
       await dispatch(likeAndUnlikePost({ postId: post._id })).unwrap();
+
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: post.isLiked ? "Unliked post." : "Liked post ❤️",
-        })
+        }),
       );
     } finally {
       setLikeLoading(false);
@@ -48,6 +80,7 @@ function Post({ post }) {
   // Enter edit mode
   function handleStartEdit(e) {
     e.stopPropagation();
+
     setEditedCaption(post.caption || "");
     setIsEditing(true);
   }
@@ -55,6 +88,7 @@ function Post({ post }) {
   // Cancel edit
   function handleCancelEdit(e) {
     e?.stopPropagation?.();
+
     setIsEditing(false);
     setEditedCaption(post.caption || "");
   }
@@ -64,43 +98,49 @@ function Post({ post }) {
     e.stopPropagation();
 
     const trimmed = editedCaption.trim();
+
     if (!trimmed) {
       dispatch(
         showToast({
           type: TOAST_FAILURE,
           message: "Caption cannot be empty.",
-        })
+        }),
       );
+
       return;
     }
 
-    // If caption didn't change, just cancel edit
     if (trimmed === post.caption) {
       setIsEditing(false);
       return;
     }
 
     if (editLoading) return;
+
     setEditLoading(true);
 
     try {
       await dispatch(
-        updatePost({ postId: post._id, caption: trimmed })
+        updatePost({
+          postId: post._id,
+          caption: trimmed,
+        }),
       ).unwrap();
 
       dispatch(
         showToast({
           type: TOAST_SUCCESS,
           message: "Post updated successfully.",
-        })
+        }),
       );
+
       setIsEditing(false);
     } catch (err) {
       dispatch(
         showToast({
           type: TOAST_FAILURE,
           message: "Failed to update post.",
-        })
+        }),
       );
     } finally {
       setEditLoading(false);
@@ -116,6 +156,7 @@ function Post({ post }) {
   // Confirm delete
   async function handleConfirmDelete() {
     if (deleteLoading) return;
+
     setDeleteLoading(true);
 
     try {
@@ -125,15 +166,16 @@ function Post({ post }) {
         showToast({
           type: TOAST_SUCCESS,
           message: "Post deleted successfully.",
-        })
+        }),
       );
+
       setShowDeleteModal(false);
     } catch (err) {
       dispatch(
         showToast({
           type: TOAST_FAILURE,
           message: "Failed to delete post.",
-        })
+        }),
       );
     } finally {
       setDeleteLoading(false);
@@ -145,6 +187,40 @@ function Post({ post }) {
     setShowDeleteModal(false);
   }
 
+  // CREATE COMMENT
+  async function handleCreateComment() {
+    if (!commentText.trim()) return;
+
+    if (commentLoading) return;
+
+    setCommentLoading(true);
+
+    try {
+      await dispatch(
+        createComment({
+          postId: post._id,
+          text: commentText,
+        }),
+      ).unwrap();
+
+      setCommentText("");
+    } finally {
+      setCommentLoading(false);
+    }
+  }
+
+  // DELETE COMMENT
+  async function handleDeleteComment(commentId) {
+    try {
+      await dispatch(
+        deleteComment({
+          commentId,
+          postId: post._id,
+        }),
+      ).unwrap();
+    } catch (err) {}
+  }
+
   return (
     <div className="Post">
       <div
@@ -152,6 +228,7 @@ function Post({ post }) {
         onClick={() => navigate(`/profile/${post.owner._id}`)}
       >
         <Avatar src={post.owner?.avatar?.url} />
+
         <h4>{post.owner?.name}</h4>
 
         {isMyPost && (
@@ -165,6 +242,7 @@ function Post({ post }) {
                 >
                   Edit
                 </button>
+
                 <button
                   type="button"
                   className="post-action-btn delete"
@@ -196,6 +274,7 @@ function Post({ post }) {
           ) : (
             <AiOutlineHeart className="icon" />
           )}
+
           <h4>{`${post.likesCount} likes`}</h4>
         </div>
 
@@ -207,6 +286,7 @@ function Post({ post }) {
               onChange={(e) => setEditedCaption(e.target.value)}
               placeholder="Edit caption"
             />
+
             <div className="edit-actions">
               <button
                 type="button"
@@ -216,6 +296,7 @@ function Post({ post }) {
               >
                 {editLoading ? "Saving..." : "Save"}
               </button>
+
               <button
                 type="button"
                 className="btn-secondary"
@@ -231,13 +312,59 @@ function Post({ post }) {
         )}
 
         <h6 className="time-ago">{post?.timeAgo}</h6>
+
+        {/* COMMENTS SECTION */}
+
+        <div className="comments-section">
+          <div className="add-comment">
+            <input
+              type="text"
+              placeholder="Write a comment..."
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+            />
+
+            <button
+              className="btn-primary"
+              onClick={handleCreateComment}
+              disabled={commentLoading}
+            >
+              Comment
+            </button>
+          </div>
+
+          <div className="comments-list">
+            {comments.map((comment) => (
+              <div key={comment._id} className="comment-item">
+                <div className="comment-left">
+                  <Avatar src={comment?.owner?.avatar?.url} />
+
+                  <div className="comment-content">
+                    <h5>{comment?.owner?.name}</h5>
+
+                    <p>{comment?.text}</p>
+                  </div>
+                </div>
+
+                {myProfile?._id === comment?.owner?._id && (
+                  <MdDelete
+                    className="delete-comment"
+                    onClick={() => handleDeleteComment(comment._id)}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       {showDeleteModal && (
         <div className="modal-overlay">
           <div className="modal">
             <h3>Delete Post?</h3>
+
             <p>This action cannot be undone.</p>
+
             <div className="modal-actions">
               <button
                 type="button"
@@ -247,6 +374,7 @@ function Post({ post }) {
               >
                 Cancel
               </button>
+
               <button
                 type="button"
                 className="btn-danger"

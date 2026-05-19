@@ -4,6 +4,7 @@ import dbConnect from "./dbConnect.js";
 import authRouter from "./routers/authRouter.js";
 import postsRouter from "./routers/postsRouter.js";
 import userRouter from "./routers/userRouter.js";
+import commentsRouter from "./routers/commentsRouter.js";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import { v2 as cloudinary } from "cloudinary";
@@ -61,6 +62,7 @@ app.use(
 app.use("/auth", authRouter);
 app.use("/posts", postsRouter);
 app.use("/user", userRouter);
+app.use("/comments", commentsRouter);
 
 // Health check
 app.get("/", (req, res) => {
